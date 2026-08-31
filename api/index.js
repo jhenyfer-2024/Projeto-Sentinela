@@ -26,12 +26,23 @@ function readDB() {
       usuarios: [],
       pacientes: [],
       triagens: [],
-      consultas: []
+      consultas: [],
+      tv_chamada: null,
+      tv_historico: []
     };
   }
 
   try {
-    return JSON.parse(fs.readFileSync(DB_FILE, "utf8"));
+    const db = JSON.parse(fs.readFileSync(DB_FILE, "utf8"));
+
+    if (!db.usuarios) db.usuarios = [];
+    if (!db.pacientes) db.pacientes = [];
+    if (!db.triagens) db.triagens = [];
+    if (!db.consultas) db.consultas = [];
+    if (!db.tv_chamada) db.tv_chamada = null;
+    if (!db.tv_historico) db.tv_historico = [];
+
+    return db;
   } catch (error) {
     console.error("Erro ao ler o banco de dados:", error);
 
@@ -39,7 +50,9 @@ function readDB() {
       usuarios: [],
       pacientes: [],
       triagens: [],
-      consultas: []
+      consultas: [],
+      tv_chamada: null,
+      tv_historico: []
     };
   }
 }
@@ -104,15 +117,20 @@ app.post("/atendimento", (req, res) => {
     createdAt: new Date()
   };
 
-  if (!Array.isArray(db.pacientes)) {
-    db.pacientes = [];
-  }
-
   db.pacientes.push(paciente);
 
   writeDB(db);
 
   res.json(paciente);
+});
+
+// ===============================
+// LISTAR PACIENTES
+// ===============================
+app.get("/pacientes", (req, res) => {
+  const db = readDB();
+
+  res.json(db.pacientes);
 });
 
 // ===============================
@@ -145,10 +163,6 @@ app.post("/triagem", (req, res) => {
     createdAt: new Date()
   };
 
-  if (!Array.isArray(db.triagens)) {
-    db.triagens = [];
-  }
-
   db.triagens.push(triagem);
 
   writeDB(db);
@@ -162,7 +176,49 @@ app.post("/triagem", (req, res) => {
 app.get("/triagens", (req, res) => {
   const db = readDB();
 
-  res.json(db.triagens || []);
+  res.json(db.triagens);
+});
+
+// ===============================
+// TV - CHAMAR PACIENTE
+// ===============================
+app.post("/tv/chamar", (req, res) => {
+  const db = readDB();
+
+  const chamada = {
+    id: Date.now().toString(),
+    localTipo: req.body.localTipo,
+    localNumero: req.body.localNumero,
+    paciente: req.body.paciente,
+    hora: new Date().toLocaleTimeString("pt-BR", {
+      hour: "2-digit",
+      minute: "2-digit"
+    })
+  };
+
+  db.tv_chamada = chamada;
+
+  db.tv_historico.unshift(chamada);
+
+  if (db.tv_historico.length > 5) {
+    db.tv_historico.pop();
+  }
+
+  writeDB(db);
+
+  res.json(chamada);
+});
+
+// ===============================
+// TV - CONSULTAR CHAMADA
+// ===============================
+app.get("/tv/chamada", (req, res) => {
+  const db = readDB();
+
+  res.json({
+    chamada: db.tv_chamada,
+    historico: db.tv_historico
+  });
 });
 
 // ===============================
@@ -198,10 +254,6 @@ app.post("/consulta", (req, res) => {
     createdAt: new Date()
   };
 
-  if (!Array.isArray(db.consultas)) {
-    db.consultas = [];
-  }
-
   db.consultas.push(consulta);
 
   writeDB(db);
@@ -210,16 +262,16 @@ app.post("/consulta", (req, res) => {
 });
 
 // ===============================
-// MEDICAÇÕES / CONSULTAS
+// MEDICAÇÕES
 // ===============================
 app.get("/medicacoes", (req, res) => {
   const db = readDB();
 
-  res.json(db.consultas || []);
+  res.json(db.consultas);
 });
 
 // ===============================
-// TESTE DA API
+// STATUS
 // ===============================
 app.get("/status", (req, res) => {
   res.json({
